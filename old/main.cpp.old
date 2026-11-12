@@ -1,0 +1,263 @@
+/*============================================================================
+ *============================================================================
+ *
+ *  Commandes de vannes
+ * 
+ *  Cablages:
+ * 
+ *   Shift Register :
+ *        DATA     D13
+ *        CLOCK    D12
+ *        LATCH    D14  
+ * 
+ *  Activé le Web : D22
+ * 
+ * 
+ *============================================================================
+ *============================================================================*/
+#include <Arduino.h>
+#include <EEPROM.h>
+#include "ShiftRegister74HC595.h"
+#include "NetMan.h"
+
+
+/*---------------------------------------------------------------------------
+ *  Gestion du WEB 
+ *---------------------------------------------------------------------------*/
+#define PIN_WEB     22
+bool webActif = false;  // le wifi et le web sont activé ?
+unsigned long lastWebPressed = 0;
+
+// WIFI parameter
+#define WIFI_SSI        "INSTRU"
+#define WIFI_PASSWORD   "12345678"
+#define WIFI_IP         "10.0.0.1"
+#define WIFI_MASQUE     "255.255.255.0"
+NetMan nm;
+
+
+
+void readParametersInEEPROM()
+{
+
+}
+
+const char Web_page[] PROGMEM = R"=====( 
+<!DOCTYPE html>
+<html>
+  <style>
+    .displayobject{
+       font-family: sans-serif;
+       margin: auto;
+       text-align: center;
+       width: 50%;
+       border: 3px solid #000000;
+       padding: 10px;
+       background: #558ED5;
+    }
+    h1 {
+      font-size: 36px;
+      color: white;
+    }
+    h4 {
+      font-size: 30px;
+      color: yellow;
+    }
+  </style>
+  <body>
+     <div class = "displayobject">
+       <h1>Update only webpage Values - no refresh needed!</h1><br>
+       <h4>Temperature reading: <span id="TEMPvalue">0</span>&deg</h4>
+       <h4>Humidity reading: <span id="HUMIvalue">0</span>%</h4>
+       <h4>Pressure reading: <span id="PRESvalue">0</span>hPa</h4><br>
+     </div>
+     <script>
+       setInterval(function() {getSensorData();}, 1000); // Call the update function every set interval e.g. 1000mS or 1-sec
+  
+       function getSensorData() {
+          var xhttp = new XMLHttpRequest();
+          xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            document.getElementById("TEMPvalue").innerHTML = this.responseText;
+          }
+        };
+        xhttp.open("GET", "TEMPread", true);
+        xhttp.send();
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            document.getElementById("HUMIvalue").innerHTML = this.responseText;
+          }
+        };
+        xhttp.open("GET", "HUMIread", true);
+        xhttp.send();
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            document.getElementById("PRESvalue").innerHTML = this.responseText;}
+        };  
+        xhttp.open("GET", "PRESread", true);
+        xhttp.send(); 
+      }
+    </script>
+  </body>
+</html>
+)=====";
+/*==============================================================
+ *
+ * Gestion du WEB
+ * 
+ *==============================================================*/
+/*
+ * Page HTML principal
+ */
+#ifdef OLDCODE
+void handleRoot(AsyncWebServerRequest *request) 
+{
+  nm._request = request;
+  String ligne;
+
+  DEBUG1("----------------------");
+  DEBUG1("handleRoot()");
+
+
+  // --------------------------
+  // on récupère les valeurs de la page HTML après un submit
+  // --------------------------
+ 
+
+  // --------------------------
+  // Affichage de la page HTML
+  // --------------------------
+  nm.clear();
+
+  nm.add("<html>");
+  nm.add("<head>");
+  nm.add("<meta charset=\"UTF-8\">");
+  nm.add("<title>push probeer</title>");
+  nm.add(" <script type=\"text/javascript\">");
+  nm.add("<!--");
+  
+  nm.add("//put your ip:port here:");
+  nm.add("//see push.ino for ESP server side sketch");
+	nm.add("var ESPurl = \"/zend\";");
+
+	nm.add("if(typeof(EventSource) !== \"undefined\") {");
+	nm.add("	var source = new EventSource(ESPurl);");
+	nm.add("source.onmessage = function(event) {");
+  nm.add("		document.getElementById(\"hier\").innerHTML = event.data + \" [data]<br>\";");
+	nm.add("};");
+
+	nm.add("} else {");
+	nm.add("	document.write(\"Your browser does not support EventSource, buy a better one!\")");
+	nm.add("}");
+	nm.add("//-->");
+  nm.add("</script>");
+  nm.add("</head>");
+  nm.add("<body>");
+  nm.add("<div id=hier></div>");
+  nm.add("</body>");
+  nm.add("</html>");
+
+  nm.sendHTML();
+}
+#endif 
+
+unsigned int cc=0;
+
+void handleRoot(AsyncWebServerRequest *request) { // This function is called by the script to update the sensor value, in this example random data!
+
+  nm._request = request;
+  nm._request->send(200, "text/html", Web_page); //Send web page
+}
+
+void handleTEMP(AsyncWebServerRequest *request) { // This function is called by the script to update the sensor value, in this example random data!
+  // temp = String(bme.readTemperature(),2);
+  // server.send(200, "text/plain", temp));
+  nm._request = request;
+  nm._request->send(200, "text/plain", String((float)random(195,209)/10,2)); //Send sensor reading when there's a client ajax request
+}
+
+
+
+void handleHUMI(AsyncWebServerRequest *request) { // This function is called by the script to update the sensor value, in this example random data!
+  nm._request = request;
+  nm._request->send(200, "text/plain", String((float)random(501,523)/10,2)); //Send sensor reading when there's a client ajax request
+}
+
+void handlePRES(AsyncWebServerRequest *request) { // This function is called by the script to update the sensor value, in this example random data!
+  nm._request = request;
+  nm._request->send(200, "text/plain", String((float)random(10161,10169)/10,2)); //Send sensor reading when there's a client ajax request
+}
+
+
+#ifdef OLDCODE
+void handleZend(AsyncWebServerRequest *request) 
+{
+  static unsigned long count=0;
+  nm._request = request;
+  String ligne;
+
+
+  count ++;
+  DEBUG1("----------------------");
+  DEBUG2("handleZend() ",count);
+  
+
+        // char str[80];
+        // sprintf(str, "data: Send %d \n\n", cc);
+        // return str;
+
+  AsyncWebServerResponse *response = nm._request->beginChunkedResponse("text/event-stream", 
+    [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if(index){ //already sent
+            return 0;
+        }
+        return snprintf((char *)buffer, maxLen, "data: Send %d \n\n", cc);
+    });
+  response->addHeader("Cache-Control", "no-cache");
+  nm._request->send ( response ); 
+}
+#endif
+
+/*
+ * initialisation du WIFI + Web
+ */
+void setupWeb()
+{
+  DEBUG1("Configuration Wifi & webserver ...");
+  IPAddress ip;
+  IPAddress masqueip;
+  ip.fromString(WIFI_IP);
+  masqueip.fromString(WIFI_MASQUE);
+  nm.connectWifiAP (WIFI_SSI,WIFI_PASSWORD,ip,ip,masqueip);
+  nm.on("/",handleRoot);
+//  nm.on("/zend",handleZend);
+  nm.on("/TEMPread",handleTEMP);
+  nm.on("/HUMIread",handleHUMI);
+  nm.on("/PRESread",handlePRES);
+  nm.begin();
+}
+
+void setup() {
+
+  Serial.begin(115200);
+  while (! Serial);
+  DEBUG1("SETUP...");
+
+  DEBUG1("  EEPROM...");
+  EEPROM.begin(512);
+
+  DEBUG1("  readParametersInEEPROM...");
+  readParametersInEEPROM();
+
+  setupWeb();
+}
+
+void loop() {
+  cc++;
+  if (cc>10000) cc=0;
+}
+

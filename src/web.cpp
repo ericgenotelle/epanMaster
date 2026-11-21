@@ -355,15 +355,16 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
   DEBUG1("----------------------");
   DEBUG2("_handleConfig()",modeUser);
 
+
   // --------------------------
   // Affichage de la page HTML
   // --------------------------
   nm.clear();
-  // if (modeUser) {
-  //   // nm.head(String (APPLI_NAME) + " - Sensibilité piezzo");
-  // }  else {
-  nm.head(String (APPLI_NAME) + " - Paramétrage");
-  // }
+  if (modeUser) {
+    nm.head(String (APPLI_NAME) + " - Sensibilité piezzo");
+  }  else {
+    nm.head(String (APPLI_NAME) + " - Paramétrage");
+  }
   nm.add("<script>");
   nm.add( "" );
 
@@ -382,7 +383,30 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
   nm.add( "  document.getElementById(champ).value = v.toString(); " );
   nm.add( "}");
   nm.add( "" );
-  
+
+    nm.add("function changeThreshold(note) {");
+//  nm.add( "  alert(action);");
+  nm.add( "  var xhttp = new XMLHttpRequest();");
+  nm.add( "  xhttp.onreadystatechange = function() {");
+  nm.add( "    if (this.readyState == 4 && this.status == 200) {");
+  nm.add( "    }" );
+  nm.add( "  };" );
+  nm.add( "  var uri = '/rest?action=threshold&arg1=' + note + '&arg2=' +  document.getElementById('threshold' + note +'').value;" );
+  nm.add( "  xhttp.open('GET', uri, true);");
+  nm.add( "  xhttp.send(); ");
+  nm.add( "}" );
+  nm.add( "" );
+
+  for (uint8_t cardId=0; cardId < instru.nbCards; cardId++) {
+    nm.add("function changeThresholdM" + String(cardId) + "() {");
+    for (int i=0; i<instru.cards[cardId]->nbNotes; i++) {
+      nm.add( "    document.getElementById('threshold" + String( (cardId*10) + i) + "').value = document.getElementById('thresholdM" + String(cardId) + "').value; "  );
+      nm.add( "    changeThreshold(" + String( (cardId*10) + i) + ");" );
+    }
+    nm.add( "}" );
+    nm.add( "" );
+ }
+
 
   nm.add("function doAction(action,arg1) {");
 //  nm.add( "  alert(doAction);");
@@ -399,7 +423,43 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
   nm.add("</script>");
 
   nm.add("<body>");
- 
+
+  if (modeUser) {
+    nm.add( "<h2>" + String(APPLI_NAME) + " Configuration</h2>");
+    nm.add( "<table>");
+    nm.row( "<td>&nbsp;</td> <th>Seuil déclenchement</th> ");
+
+    for (uint8_t cardId=0; cardId < instru.nbCards; cardId++) {
+
+      nm.row( "<tr><td colspan=2 class='blanche'>Carte " + String(cardId) + " </td>  ");
+      nm.add( "<tr><td class='blanche'><b>Toutes notes</b></td>  ");
+      nm.add( "  <td><input id='thresholdM  " + String(cardId) + "' type='number' min='1' max='4095' required class='plage' value='"  +  String(PIEZZO_THRESHOLD_DEF) + "'/> ");
+      nm.add("   <button onclick=\" incValue('thresholdM" + String(cardId) + "',-50);  changeThresholdM" + String(cardId) + "();  \"  id='thresholdMdec" + String(cardId) + "' > - </button>");
+      nm.add("  <button onclick=\"  incValue('thresholdM" + String(cardId) + "', 50);  changeThresholdM" + String(cardId) + "();  \"  id='thresholdMinc" + String(cardId) + "' > + </button>");
+      nm.add("</td>  </tr>"); 
+
+      for (int i=0; i<instru.cards[cardId]->nbNotes; i++) {
+        char noteName[10];
+        getNoteName( noteName, instru.cards[cardId]->notes[i] );
+        nm.add( "<tr><th>" + String( noteName ) + "</th>  ");
+        nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[i].threshold + "'/> ");
+        nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "',-50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholddec" + String( (cardId*10) + i ) + "' > - </button>");
+        nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "', 50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholdinc" + String( (cardId*10) + i ) + "' > + </button>");
+        nm.add("</td>  </tr>"); 
+      }
+
+
+      nm.row( "<td colspan=2>  <button onclick=\" doAction('saveconfig','');  \"  id='saveconfig' > Enregistrer </button> </td>");
+    }
+
+    nm.add( "</table>");
+    nm.add("<p> ");
+    nm.add(" <button onclick=\" doAction('resetconfig',''); sleep(1000); window.location.href='/piezzo';  \"  id='resetconfig' > Restaurer Config Usine</button> ");
+    nm.add(" <button onclick=\" doAction('reboot','');  \"  id='reboot' > Reboot </button> ");
+    nm.add("<p><button onclick=\"javascript:window.location.href='/' \"  id='home' > Accueil </button> ");
+
+  } else {
+
     nm.add( "");
     nm.add( "<p><table id='tparam'>");
 
@@ -419,6 +479,7 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
     nm.add(" <button onclick=\" doAction('resetconfig',''); sleep(1000); window.location.href='/config';  \"  id='resetconfig' > Restaurer Config Usine</button> ");
     nm.add(" <button onclick=\" doAction('reboot','');  \"  id='reboot' > Reboot </button> ");
     nm.add("<p><button onclick=\"javascript:window.location.href='/' \"  id='home' > Accueil </button> ");
+  }
 
   // ----------------------------------------
   // Javascript - end of page
@@ -440,6 +501,11 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
 void _handleConfigAdmin(AsyncWebServerRequest *request) 
 {
   _handleConfig(request,false);
+}
+
+void _handleConfigUser(AsyncWebServerRequest *request) 
+{
+  _handleConfig(request,true);
 }
 
 //------------------------------------------------------------------------------------------------------------------------
@@ -661,12 +727,37 @@ void _handleRest(AsyncWebServerRequest *request)
   }
 
   //-----------------------------------------------
+  // Thresholds
+  //-----------------------------------------------
+  if ( (!actionDone)  && (!strcmp(value,"threshold") ) ) {
+    song.idChange++;
+    actionDone = true;
+    res = true;
+    int16_t noteEnc;
+    int16_t threshold;
+    nm.getParamInt("arg1",&noteEnc,&nbChanged);
+    nm.getParamInt("arg2",&threshold,&nbChanged);
+    DEBUG3("threshold",noteEnc,threshold);
+    uint8_t cardId = noteEnc / 10;
+    uint8_t no = noteEnc % 10;
+    DEBUG3("  cardId / no",cardId,no);
+
+    nm.add( "ok" );
+    sounds [  netCards[ cardId ].idxSounds[no] ].threshold = threshold;
+    sendCommThreshold( cardId, no, threshold );
+    return; 
+  }     
+
+
+
+  //-----------------------------------------------
   // Check all parameters
   //-----------------------------------------------
   for (int i=0; i<nbParameters; i++ ) {
     if ( _checkParamSongInt(value, parameters[i].name.c_str(), &tmpInt , 0) ) {
       DEBUG2(parameters[i].name,tmpInt);
       *(parameters[i].pValue) = tmpInt;
+      sendAllCardsParam(  parameters[i].name.c_str(), tmpInt );
       return;
     }    
   }
@@ -1101,6 +1192,7 @@ void setupWeb()
   DEBUG1("  Setup Web pages...")
   nm.on("/",_handleRoot);
   nm.on("/config",_handleConfigAdmin);
+  nm.on("/piezzo",_handleConfigUser);
   nm.on("/rest",_handleRest);
   nm.on("/test",_handleTest);
   nm.on("/debug",_handleDebug);

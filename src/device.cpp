@@ -20,12 +20,13 @@
 #include <Wire.h>
 #endif
 
-#include "device.h"
 #include "config.h"
 #include "global.h"
+#include "device.h"
 #include "midifile.h"
 
-#include "steel.h"
+#include "instru.h"
+#include "engine.h"
 
 
 #ifdef MIDI_SEND
@@ -40,18 +41,18 @@ MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MidiUsb);
 #define LED_PIN 48
 Adafruit_NeoPixel pixels(NUMPIXELS,LED_PIN,NEO_GRB + NEO_KHZ800);
 
-T_BidonPeer bidonsPeer[NB_BIDONS_MAX];
+T_NetCard netCards[ NB_CARDS_MAX ];
 
 
 
 // Frame
-//   0 : bowlId
+//   0 : cardId
 //   1 : command
 //   2 : param
 //   3 : value MSB 
 //   4 : value LSB    
 #define FRAME_LEN           5
-#define DATA_BOWLID                   0
+#define DATA_CARDID                   0
 #define DATA_CMD                      1
 #define DATA_PARAM                    2
 #define DATA_VALUE_MSB                3
@@ -59,14 +60,23 @@ T_BidonPeer bidonsPeer[NB_BIDONS_MAX];
 
 
 // Pad -> Master
-#define CMD_PING                  1
-#define CMD_HIT_PAD               2
+#define CMD_PING                      0
+#define CMD_CNX                       1
+#define CMD_HIT_PAD                   2
 
 // Master -> Pad
-#define CMD_SET_LED             100   
-#define CMD_SET_PARAM           101
-#define CMD_GO_ADC              102
-#define CMD_SET_THRESHOLD       103
+#define CMD_SET_LED                 100   
+#define CMD_SET_PARAM               101      // See PARAM_*
+#define CMD_GO_ADC                  102
+#define CMD_SET_THRESHOLD           103
+
+#define PARAM_CARDID                  0
+#define PARAM_PIEZZO_VOLUME_MIN       1
+#define PARAM_PIEZZO_LEVEL_MIN        2
+#define PARAM_PIEZZO_LEVEL_MAX        3  
+#define PARAM_DELAY_PIEZZO_MIN        4
+#define PARAM_DELAY_PIEZZO_MAX        5
+#define PARAM_NB_NOTES                6
 
 
 //------------------------------------------------------------------------------------------------------------------------
@@ -262,59 +272,64 @@ void resetConfigEEPROM()
 }
 
 
+
 //------------------------------------------------------------------------------------------------------------------------
 /// @brief Switch ON/OFF a LED  related to a sound
 /// @param idxSound  Index of a sound
 /// @param on true=To switch ON, false=to switch OFF, 
 /// @param hand if on=true , Right or Left . If on=false, switch off both LED
-void displayLED(int idxSound, bool on, HandLeftRight hand) 
+void displayLED(int idxSound, bool on, HandLeftRight hand ) 
 {
 
-    DataPacket packet;
-    packet.bidonId = sounds[idxSound].bidonId;
-    packet.data1 = sounds[idxSound].noteMidi;
+    // DataPacket packet;
+    // packet.cardId = sounds[idxSound].cardId;
+    // packet.data1 = sounds[idxSound].noteMidi;
+
+    uint8_t cardId = sounds[idxSound].cardId;
+    uint8_t no = sounds[idxSound].no;
 
     // Define with LED to be displayed
     if (!on)  {
-      packet.data2 = 0b00;
-      sounds[idxSound].ledRightOn = false;
-      sounds[idxSound].ledLeftOn = false;
+      sendCommSetLED( cardId , no , HandLeft, false );
+      sendCommSetLED( cardId , no , HandRight, false );
+      netCards[cardId].ledLeftOn[no] = false;
+      netCards[cardId].ledRightOn[no] = false;
     } else {
       switch (hand) {
         case HandLeft:
-          packet.data2 = 0b10;
-          sounds[idxSound].ledRightOn = false;
-          sounds[idxSound].ledLeftOn = true;
+          sendCommSetLED( cardId , no , HandLeft, true );
+          sendCommSetLED( cardId , no , HandRight, false );
+          netCards[cardId].ledLeftOn[no] = true;
+          netCards[cardId].ledRightOn[no] = false;
           break;
         case HandRight:
-          packet.data2 = 0b01;
-          sounds[idxSound].ledRightOn = true;
-          sounds[idxSound].ledLeftOn = false;
+          sendCommSetLED( cardId , no , HandLeft, false );
+          sendCommSetLED( cardId , no , HandRight, true );
+          netCards[cardId].ledLeftOn[no] = false;
+          netCards[cardId].ledRightOn[no] = true;
           break;
         case HandBoth:
-          packet.data2 = 0b11;
-          sounds[idxSound].ledRightOn = true;
-          sounds[idxSound].ledLeftOn = true;
+          sendCommSetLED( cardId , no , HandLeft, true );
+          sendCommSetLED( cardId , no , HandRight, true );
+          netCards[cardId].ledLeftOn[no] = true;
+          netCards[cardId].ledRightOn[no] = true;
           break;
         default:
-          sounds[idxSound].ledRightOn = false;
-          sounds[idxSound].ledLeftOn = false;
-          packet.data2 = 0b00;
+          sendCommSetLED( cardId , no , HandLeft, false );
+          sendCommSetLED( cardId , no , HandRight, false);
+          netCards[cardId].ledLeftOn[no] = false;
+          netCards[cardId].ledRightOn[no] = false;
       }
     }
 
+    // TBD
     if (on && !song.playing) {
       sounds[idxSound].timeMsStop = millis() + conf.DELAY_LED;
     }
 
     // Send LED
-    DEBUG3("displayLED",packet.data1,packet.data2);
+    // DEBUG3("displayLED",packet.data1,packet.data2);
 
-    #ifdef ESPNOW    
-    esp_now_send(sounds[idxSound].bidonPeer->mac,
-                (uint8_t *)&packet,
-                sizeof(packet));
-#endif
 
 }
 
@@ -632,65 +647,65 @@ void setupMIDI()
 }
 
 
-//=======================================================================================================================
-//
-//  Functions for communication ESP NOW
-//
-//=======================================================================================================================
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+//     COMMUNICATION functions
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
 
-bool isNewBidonConnection(uint8_t bidonId,const uint8_t *adr_recv)
+
+#ifdef ESPNOW
+bool isNewCardConnection(uint8_t cardId,const uint8_t *adr_recv)
 {
-  for (int i=0; i<conf.nbBidons; i++) {
-    if ( bidonsPeer[i].bidonId == bidonId ) {
+  for (int i=0; i<conf.nbCards; i++) {
+    if ( netCards[i].cardId == cardId ) {
       // already referenced
       return false;
     }
   }
 
-  DEBUG2("New bidon",bidonId);
+  DEBUG2("New card",cardId);
 
-  bidonsPeer[ conf.nbBidons ].bidonId = bidonId;
-  for (int i=0; i<conf.instru->nbBidons; i++) {
-    if ( conf.instru->bidons[i]->id == bidonId ) {
-      bidonsPeer[ conf.nbBidons ].bidon = conf.instru->bidons[i];
-      i = conf.instru->nbBidons;
+  netCards[ conf.nbCards ].cardId = cardId;
+  for (int i=0; i<conf.instru->nbBowls; i++) {
+    if ( conf.instru->cards[i]->id == cardId ) {
+      netCards[ conf.nbCards ].card = conf.instru->cards[i];
+      i = conf.instru->nbBowls;
     }
   }
 
-  memcpy(bidonsPeer[ conf.nbBidons ].mac, adr_recv, 6);
+  memcpy(netCards[ conf.nbCards ].mac, adr_recv, 6);
 
-  // Register bidon peer to send info
-  memcpy(bidonsPeer[ conf.nbBidons ].peerInfo.peer_addr, adr_recv, 6);
-  bidonsPeer[ conf.nbBidons ].peerInfo.channel = 0;
-  bidonsPeer[ conf.nbBidons ].peerInfo.encrypt = false;
+  // Register card peer to send info
+  memcpy(netCards[ conf.nbCards ].peerInfo.peer_addr, adr_recv, 6);
+  netCards[ conf.nbCards ].peerInfo.channel = 0;
+  netCards[ conf.nbCards ].peerInfo.encrypt = false;
   
-  #ifdef ESPNOW
-  c_add_peer(& bidonsPeer[ conf.nbBidons ].peerInfo);
-  #endif
+  c_add_peer(& netCards[ conf.nbBowls ].peerInfo);
 
 
-  // Register BidonPeer in sounds table
+  // Register CardPeer in sounds table
   for (int i=0; i<NB_SOUNDS; i++) {
-    if ( sounds[i].bidonId == bidonId ) {
-      sounds[i].bidonPeer = & bidonsPeer[ conf.nbBidons ];
+    if ( sounds[i].cardId == cardId ) {
+      sounds[i].netCard = & netCards[ conf.nbCards ];
     }
   }
 
-  conf.nbBidons++;
+  conf.nbCards++;
 
-  // Check if all bidons are connected
-  if (conf.nbBidons == conf.instru->nbBidons) {
-    DEBUG1("allBidonConnected");
-    conf.allBidonConnected = true;
+  // Check if all cards are connected
+  if (conf.nbCards == conf.instru->nbBowls) {
+    DEBUG1("all cards sonnected");
+    conf.allCardsConnected = true;
   }
 
   return true;
 }
 
+#endif
 
 
 #ifdef ESPNOW
-
 //------------------------------------------------------------------------------------------------------------------------
 /// @brief Callback function when receiving packet from MASTER
 /// @param adr_recv 
@@ -703,18 +718,18 @@ void OnDataRecv(const uint8_t *adr_recv,
   DataPacket packet;
   memcpy(&packet, incomingData, sizeof(packet));
 
-  if (!conf.allBidonConnected) {
-    isNewBidonConnection( packet.bidonId, adr_recv );
+  if (!conf.allCardsConnected) {
+    isNewCardConnection( packet.cardId, adr_recv );
   }
 
-  DEBUG4("MASTER OnDataRecv", packet.bidonId, packet.data1, packet.data2);
+  DEBUG4("MASTER OnDataRecv", packet.cardId, packet.data1, packet.data2);
   // conf.lastReceived = millis();
 
   // Set lastReceived
-  for (int i=0; i<conf.nbBidons; i++) {
-    if ( bidonsPeer[i].bidonId =  packet.bidonId ) {
-      bidonsPeer[i].lastReceived = millis();
-      i = conf.nbBidons;
+  for (int i=0; i<conf.nbBowls; i++) {
+    if ( netCards[i].cardId =  packet.cardId ) {
+      netCards[i].lastReceived = millis();
+      i = conf.nbBowls;
     }
   }
 
@@ -726,7 +741,7 @@ void OnDataRecv(const uint8_t *adr_recv,
   
   // PING response
   if ( packet.data1 == 255 ) {
-    DEBUG2("PING Response to",packet.bidonId)
+    DEBUG2("PING Response to",packet.cardId)
     esp_now_send(adr_recv,
             (uint8_t *)&packet,
             sizeof(packet));
@@ -744,8 +759,13 @@ void setupComm()
 {
 
   DEBUG1("setupComm()...");
-  
-  #ifdef ESPNOW
+
+#ifdef I2C
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
+    Wire.setTimeOut(50);                    // timeout en ms
+#endif
+
+#ifdef ESPNOW
 
   WiFi.mode(WIFI_AP_STA);
 
@@ -761,59 +781,213 @@ void setupComm()
   esp_now_register_recv_cb(OnDataRecv);  
 #endif
 
-#ifdef I2C
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
-    Wire.setTimeOut(50);                    // timeout en ms
-#endif
+
 
 }
 
-
-void sendCommValue(int8_t bowlId, int8_t cmd, int8_t param, uint16_t value)
+void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
 {
     uint8_t data[FRAME_LEN];
     uint32_t written = 0;
 
-    data[DATA_BOWLID] = bowlId;
+  netCards[cardId].lastSent = millis();
+
+#ifdef I2C
+    data[DATA_CARDID] = cardId;
     data[DATA_CMD] = cmd;
     data[DATA_PARAM] = param;
     data[DATA_VALUE_MSB] = (value >> 8) & 0xFF;
     data[DATA_VALUE_LSB] = value & 0xFF;
 
-    Wire.beginTransmission( I2C_SLAVE_ADDR ); // TBD
+    Wire.beginTransmission( netCards[cardId].i2cSlaveAddr ); 
     Wire.write(data, FRAME_LEN);
     Wire.endTransmission();
+#endif
 }
-    
+
+void sendCommSetLED(uint8_t cardId , uint8_t no, HandLeftRight hand, bool on ) 
+{
+  int8_t offset = (hand == HandRight) ? 1 : 0 ;
+  if ( netCards[cardId].connected) {
+    sendCommValue( cardId, CMD_SET_LED, (no * 2) + offset, on ? 1 : 0);
+  }
+}
+
+void sendCommGoADC(uint8_t cardId , bool on)
+{
+  sendCommValue( cardId, CMD_GO_ADC, 0, on ? 1 : 0);
+}
+
+
+void recvCommPing(uint8_t cardId, uint8_t param, uint16_t value)
+{
+  DEBUG4("recv CMD_PING from card", cardId, param, value);
+  sendCommValue( cardId, CMD_PING, param, value);
+}
+
+void recvCommCnx(uint8_t cardId, uint8_t param, uint16_t value)
+{
+  DEBUG4("recv CMD_CNX from card", cardId, param, value);
+  checkNewCard( cardId ) ;
+  sendCardConfig( cardId );
+  sendCommGoADC( cardId , true );
+}
+
+
+void recvCommHitPad(uint8_t cardId, uint8_t param, uint16_t value)
+{
+  DEBUG4("recv CMD_HIT_PAD from card", cardId, param ,value);
+  touchNoteMidi( getMidiNoteByCardId(cardId, param) , value); 
+}
+
+
 
 void loopComm()
 {
+
 #ifdef I2C
   uint8_t    data[FRAME_LEN];
 
-  if (Wire.requestFrom((int)I2C_SLAVE_ADDR, FRAME_LEN) != FRAME_LEN) {
-      return ;
-  }
-  for (int i = 0; i < FRAME_LEN; i++) {
-    data[i] = Wire.read();
-  }
-  uint16_t value = (data[DATA_VALUE_MSB] << 8) | data[DATA_VALUE_LSB];
-  
-  switch (data[DATA_CMD]) {
+  for (int i=0; i<instru.nbCards; i++) {
+    int i2cCardAddr =  (int)I2C_CARD_ADDR_BASE + i;
+    if (Wire.requestFrom( i2cCardAddr , FRAME_LEN) != FRAME_LEN) {
+        return ;
+    }
+    for (int i = 0; i < FRAME_LEN; i++) {
+      data[i] = Wire.read();
+    }
+    uint8_t cmd = data[DATA_CMD];
+    uint8_t cardId = data[DATA_CARDID];
+    uint8_t param = data[DATA_PARAM];
+    uint16_t value = (data[DATA_VALUE_MSB] << 8) | data[DATA_VALUE_LSB];
 
-    case CMD_PING:
-      DEBUG2("CMD_PING from bowl",data[DATA_BOWLID]);
-      sendCommValue(data[DATA_BOWLID], CMD_PING, 0, 0);
-      break;
+    if ( cardId != i ) {
+      DEBUG3("ERREUR: CardId does not match i2cCardAddr",cardId,i)
+    }
+    netCards[cardId].lastReceived = millis();
+
+    switch ( cmd ) 
+    {
+      case CMD_PING:
+        recvCommPing( cardId, param, value );
+        break;
+
+      case CMD_CNX:
+        recvCommCnx( cardId, param, value );
+        break;
 
       case CMD_HIT_PAD:
-      DEBUG4("CMD_HIT_PAD from bowl",data[DATA_BOWLID],data[DATA_PARAM],value);
-//      touchNoteMidi(data[DATA_PARAM],value);
-      break;
-    default:
-      DEBUG3("Unknown command from bowl",data[DATA_BOWLID],data[DATA_CMD]);
+        recvCommHitPad( cardId, param, value );
+        break;
+
+       default:
+        DEBUG3("recv Unknown command from card", cardId, cmd );
+    }
+  }
+#endif
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+//     CARD functions
+//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------------------------------
+
+int getMidiNoteByCardId(uint8_t cardId, uint8_t no)
+{
+  if ( ! checkCardId(cardId) ) 
+    return 0;
+  if (no >= NB_NOTES_MAX) 
+    return 0;
+
+  return instru.cards[cardId]->notes[ no ];
+}
+
+
+void sendCommThreshold(uint8_t cardId, uint8_t no, uint16_t threshold)
+{
+  sendCommValue(cardId, CMD_SET_THRESHOLD, no, threshold);
+}
+
+/// --------------------------------------------------------------
+/// @brief Send config of the card to the card
+/// @param cardId 
+/// @return 
+void sendCardConfig(uint8_t cardId)
+{
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_PIEZZO_VOLUME_MIN, conf.PIEZZO_VOLUME_MIN);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_PIEZZO_LEVEL_MIN, conf.PIEZZO_LEVEL_MIN);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_PIEZZO_LEVEL_MAX, conf.PIEZZO_LEVEL_MAX);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_DELAY_PIEZZO_MIN, conf.DELAY_PIEZZO_MIN);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_DELAY_PIEZZO_MAX, conf.DELAY_PIEZZO_MAX);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_NB_NOTES, instru.cards[cardId]->nbNotes);
+  sendCommValue(cardId, CMD_SET_PARAM, PARAM_CARDID, cardId);
+
+  for (uint8_t i=0; i<instru.cards[cardId]->nbNotes; i++) {
+    sendCommThreshold(cardId, i, sounds [ netCards[cardId].idxSounds[i] ].threshold );
+  }
+}
+
+
+bool checkNewCard(uint8_t cardId)
+{
+  if ( netCards[cardId].connected == false ) {
+    DEBUG2("New card",cardId);
+
+    netCards[cardId].connected = true;
+    return true;
+  }
+  return false;
+}
+
+bool checkCardId(uint8_t id)
+{
+  if (id>=NB_CARDS_MAX)
+    return false;
+  if ( instru.cards[id] == NULL ) 
+    return false;
+  return true;
+}
+
+
+T_Card * getCardByID(uint8_t id) 
+{
+  return instru.cards[id];
+}
+
+
+uint8_t getParamIdByName(const char * name)
+{
+  if ( strcmp(name, "PIEZZO_VOLUME_MIN") == 0 ) {
+    return PARAM_PIEZZO_VOLUME_MIN;
+  }
+  if ( strcmp(name, "PIEZZO_LEVEL_MIN") == 0 ) {
+    return PARAM_PIEZZO_LEVEL_MIN;
+  }
+  if ( strcmp(name, "PIEZZO_LEVEL_MAX") == 0 ) {
+    return PARAM_PIEZZO_LEVEL_MAX;
+  }
+  if ( strcmp(name, "DELAY_PIEZZO_MIN") == 0 ) {
+    return PARAM_DELAY_PIEZZO_MIN;
+  }
+  if ( strcmp(name, "DELAY_PIEZZO_MAX") == 0 ) {
+    return PARAM_DELAY_PIEZZO_MAX;
+  }
+  return 255;
+}
+
+
+void sendAllCardsParam(const char * paramName, int16_t value)
+{
+  bool cont = true;
+
+  uint8_t paramId = getParamIdByName(paramName);
+  if ( paramId == 255 ) {
+    DEBUG1("sendCardsParam() : unknown paramName");
+    return;
   }
 
-
-#endif
+  for (int cardId=0; cardId < conf.nbCards; cardId++) {
+    sendCommValue(cardId, CMD_SET_PARAM, paramId, value);
+  }
 }

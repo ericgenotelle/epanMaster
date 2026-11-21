@@ -67,7 +67,9 @@ void loop()
   loopLED();
   loopPlayWaves();
   loopWeb();
-  loopComm();
+
+  // loopComm();
+
 #ifdef MIDI_SEND
   loopMidiMessage();
 #endif

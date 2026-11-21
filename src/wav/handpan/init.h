@@ -1,6 +1,5 @@
 #include "../../config.h"
 #include "../../midiinfo.h"
-#include "../../steel.h"
 
 #include "a2_wav.h"
 #ifndef JUST1WAV

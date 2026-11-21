@@ -11,7 +11,7 @@
 #pragma once
 
 #include "config_secret.h"
-#include "steel.h"
+// #include "steel.h"
 
 
 //------------------------------------------------------------------------------------------------
@@ -23,8 +23,13 @@
 #define PROGRAMME_TIME                  __TIME__    // Time of this program
 #define EEPROM_CRC                      2       // checksum for EEPROM. For first run or memory map change
 
-#define HANDPAN                         1
+// Select one of instruments
+#define HANDPAN                         
+// #define TENORBASS                       
+// #define DOUBLEGUITAR     
+// #define TENOR             
 
+// Select one communication mode
 #define I2C
 //#define ESPNOW
 
@@ -71,8 +76,12 @@
 #define PAN_WIFI_IP                 "10.0.0.1"              //IP address in WIFI STA mode 
 #define PAN_WIFI_MASQUE             "255.255.255.0"         //IP mask and gateway address in WIFI STA mode 
 
+#define NB_CARDS_MAX       6
+#define NB_NOTES_MAX       8   // per card
+
 #define I2C_FREQ    100000
-#define I2C_SLAVE_ADDR  0x28     // ajouter 0x29, 0x2A... pour d'autres esclaves
+#define I2C_CARD_ADDR_BASE          0x28     //  0x29, 0x2A... for next cards
+#define I2C_MASTER_ADDR             0x40 
 
 
 #define FILE_MIDI_MAX_SIZE              20000               // Max size of a MIDI file
@@ -113,6 +122,13 @@
 #define DELAY_LED_TRILLE_DEF            150         // Delay en ms when displaying trille note
 #define I2S_BUFFER_SIZE_DEF              64         // I2S buffer size
 #define I2S_BUFFER_NB_DEF                 3         // I2S number of buffers
+
+#define PIEZZO_THRESHOLD_DEF            500         // Threshold for piezzo to be considered as hit
+#define PIEZZO_VOLUME_MIN_DEF           20          // Volume at PIEZZO_LEVEL_MIN : 0 -> 127
+#define PIEZZO_LEVEL_MIN_DEF            400         // When getting analopg value from piezzo, level (0 -> 4095) to consider piezzo with volume min (=PIEZZO_VOLUME_MIN_DEF)
+#define PIEZZO_LEVEL_MAX_DEF            2000        // When getting analopg value from piezzo, level (0 -> 4095) to consider piezzo with volume max (=127)
+#define DELAY_PIEZZO_MIN_DEF            100         // Delay min in ms between 2 piezzo hits - to avoid rebonce
+#define DELAY_PIEZZO_MAX_DEF            300         // Delay max in ms between 2 piezzo hits  // TBD 10 ?
 
 
 //------------------------------------------------------------------------------------------------------------------------

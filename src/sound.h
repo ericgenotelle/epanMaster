@@ -13,8 +13,10 @@
 
 #include "arduino.h"
 #include <esp_now.h>
+
+#include "config.h"
 #include "midifile.h"
-#include "steel.h"
+#include "instru.h"
 
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
@@ -72,16 +74,8 @@ typedef struct
   uint32_t DataSize;          // Size of the data that follows
 } T_WavHeader;
 
-typedef struct 
-{
-    uint8_t             bidonId=0;
-    T_Bidon             * bidon=NULL;  
-    bool                connected=false;
-    uint8_t             mac[6];
-    esp_now_peer_info_t peerInfo = {};
-    unsigned long       lastReceived=0;
-    unsigned long       lastSent=0;
-} T_BidonPeer;
+
+
 
 
 
@@ -91,9 +85,12 @@ typedef struct
 {
     uint8_t               noteMidi;           // MIDI note 
     char                  noteName [4];   // MIDI note name
-    uint8_t               bidonId =0;      
-    T_Bidon *             bidon = NULL;
-    T_BidonPeer *         bidonPeer = NULL;
+
+    uint8_t               cardId = 0;  
+    uint8_t               no = 0;
+
+    // T_Card *              card = NULL;
+    // T_NetCard *           netCard = NULL;
 
     size_t                wavSize;
     const int16_t       * wavBody;            // WAV body
@@ -101,6 +98,7 @@ typedef struct
     bool                  ledLeftOn = false;
     bool                  ledRightOn = false;
     HandLeftRight         lastHand = HandLeft;
+    uint16_t              threshold = 4095;           // Threshold for piezzo signal to consider the volume min
     // unsigned long         lastPressed = 0;    // When the piezzo was played
     // int16_t               nbPressed = 0;      // Nb time the piezzo is pressed 
     unsigned long         lastMidiMessage = 0;       // when MIDI note has been sent
@@ -112,7 +110,7 @@ typedef struct
 /// @brief Structure for a played note. Used in table <notesPoly>
 typedef struct 
 {
-  NoteState    state;               // 'Idle' or 'Playing'
+  NoteState     state;               // 'Idle' or 'Playing'
   T_Sound *     pSound;             // Pointer to a sound <T_Sound> in table <sounds>
   uint32_t      posWav;             // cursor position in the sound WAV array
   int           volume;             // 0 -> 127  //TBD velocity ?
@@ -127,7 +125,7 @@ typedef struct
 {
 	int			        num;              // Num of the note in the song
   int             idxSound;         // index of the sound in <sounds> table
-	int			        noteMidi;         // MIDI Note
+	uint8_t		      noteMidi;         // MIDI Note
   NoteState       state;            // Idle, ToBePlayed, Played
 	int			        velocity;         // Velocity of the note : 0->127
   int             measure;          // Mesure in  which the note is
@@ -195,9 +193,9 @@ typedef struct
 //------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------
 
-void setupSound(const int16_t * wavData, size_t waveSize, int noteMidi,const char * noteName);
+void setupSound(const int16_t * wavData, size_t waveSize, uint8_t noteMidi,const char * noteName);
 void setupSounds();
-int getSoundIndexByNote(int note);
+uint8_t getSoundIndexByNote(uint8_t note);
 bool isSoundClic(int indexSound);
 
 void resetNotePoly(int i);
@@ -206,7 +204,7 @@ int getNbOfPlayingNotes();
 int getNotePolyIndexAvailable();
 
 int playSound(int idxSound, int volume);
-int playNote(int noteMidi, int volume);
+int playNote(uint8_t noteMidi, int volume);
 
 #ifdef TRACE_MIDI
 void dumpData(const char *Data, uint8_t NumBytes);

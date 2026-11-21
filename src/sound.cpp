@@ -17,7 +17,7 @@
 
 #include "config.h"
 #include "sound.h"
-#include "steel.h"
+#include "instru.h"
 #include "device.h"
 #include "global.h"
 #include "wav/clic1.h"
@@ -25,7 +25,7 @@
 #include "wav/error.h"
 
 #if defined(HANDPAN)
-    #include "wav/handpan/init.h"
+#include "wav/handpan/init.h"
 #endif 
 
 //------------------------------------------------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ static const i2s_port_t i2s_num = I2S_NUM_0;  // i2s port number
 /// @brief Reference a sound
 /// @param wavData   WAV data
 /// @param noteMidi  MIDI note related to this sound
-void setupSound(const int16_t * wavData, size_t waveSize, int noteMidi,const char * noteName) 
+void setupSound(const int16_t * wavData, size_t waveSize, uint8_t noteMidi,const char * noteName) 
 {
   uint8_t idx = conf.nbSounds;
 
@@ -107,16 +107,6 @@ void setupSound(const int16_t * wavData, size_t waveSize, int noteMidi,const cha
   conf.nbSounds = idx+1;
 }
 
-
-void setupNoteBidonId(uint8_t noteMidi, T_Bidon * bidon) {
-  for (int i=0; i<conf.nbSounds; i++) {
-    if (sounds[i].noteMidi == noteMidi) {
-      sounds[i].bidonId = bidon->id;
-      sounds[i].bidon = bidon;
-      return;
-    }
-  }
-}
 
 //------------------------------------------------------------------------------------------------------------------------
 /// @brief setup I2S and Reference alls sounds
@@ -137,17 +127,26 @@ void setupSounds()
   setupSound(clic2_wav, sizeof(clic2_wav) / 2,  NOTE_MIDI_CLIC2, "CL2");  // CLIC : NEXT BEAT OF A MEASURE
   setupSound(error_wav, sizeof(error_wav) / 2,  NOTE_MIDI_ERROR, "ERR");  // ERROR : not exist, ..
   
+  // Load waves for thi isntrument
   initWaves();
 
-  for (int i=0; i < nbSD; i++) {
-    if ( lSD[i].id == STEELDRUM_ID ) {
-      for (int j=0; j < lSD[i].nbBidons; j++) {
-        for (int k=0; k < lSD[i].bidons[j]->nbNotes; k++) {
-          setupNoteBidonId (lSD[i].bidons[j]->notes[k], lSD[i].bidons[j]);
+
+  // Setup links between netCard[] & sounds[]
+  for (int i=0; i < instru.nbCards; i++) {
+    for (int j=0; j < instru.cards [i]->nbNotes ; j++) {
+      int note =  instru.cards [i]->notes[j];
+      if ( note > 0 ) {
+        int idx = getSoundIndexByNote( note );
+        if ( idx == NOTE_ERROR ) {
+            DEBUG2("ERREUR : Note MIDI non trouvé dans la liste des sons",note);
+        } else {
+          netCards[i].idxSounds[j] = idx;
+          sounds[idx].cardId = i;
+          sounds[idx].no = j;
         }
       }
-      conf.instru = & lSD[i];
-      i = nbSD;
+      netCards[i].ledLeftOn[j] = false;
+      netCards[i].ledRightOn[j] = false;
     }
   }
 
@@ -158,7 +157,7 @@ void setupSounds()
 /// @brief Retrieve the index of the sound related to a MIDI note 
 /// @param noteMidi MIDI note
 /// @return index of the sound, -1 if not found
-int getSoundIndexByNote(int noteMidi)
+uint8_t getSoundIndexByNote(uint8_t noteMidi)
 {
   for (int i=0; i<NB_SOUNDS; i++) {
     if ( sounds[i].noteMidi == noteMidi ) {

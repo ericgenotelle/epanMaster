@@ -11,8 +11,9 @@
 #pragma once
 
 #include "arduino.h"
-#include "steel.h"
+#include "instru.h"
 #include "sound.h"
+#include "device.h"
 
 /// @brief 
 typedef struct 
@@ -27,19 +28,19 @@ typedef struct
     T_Instru * instru = NULL;
     int8_t nbSounds=0;
     int16_t volumeGen;                  // General volume : 0 ->100
-    bool allBidonConnected = false;
-    int8_t nbBidons=0;
+    bool allCardsConnected = false;
+    int8_t nbCards=0;
 
     int16_t DELAY_MAX_DOUBLE_NOTES ;    // Max delay in ms when playing double notes 
     int16_t isDemoLed ;                 // Demo LED when started
     int16_t DELAY_I2S;                  // delay in ms before checking I2s
     int16_t DELAY_LED;                  // Delay in ms when displaying LED in free mode
-    // int16_t DELAY_LED_DEMO;             // Time in ms LED is ON when displayed for the DEMO
-    // int16_t DELAY_PIEZZO_MIN;           // Delay min in ms between 2 piezzo hits - to avoid rebonce. // TBD 10 ?
-    // int16_t DELAY_PIEZZO_MAX;           // Delay max in ms between 2 piezzo hits above which we consided it is a new hit
-    // int16_t PIEZZO_LEVEL_MIN;           // Piezzo level where volume is min (=PIEZZO_VOLUME_MIN)
-    // int16_t PIEZZO_LEVEL_MAX;           // Piezzo level where volume is MAX (=128)
-    // int16_t PIEZZO_VOLUME_MIN;          // Volume at threshold : 0 -> 127
+    int16_t DELAY_LED_DEMO;             // Time in ms LED is ON when displayed for the DEMO
+    int16_t DELAY_PIEZZO_MIN;           // Delay min in ms between 2 piezzo hits - to avoid rebonce. // TBD 10 ?
+    int16_t DELAY_PIEZZO_MAX;           // Delay max in ms between 2 piezzo hits above which we consided it is a new hit
+    int16_t PIEZZO_LEVEL_MIN;           // Piezzo level where volume is min (=PIEZZO_VOLUME_MIN)
+    int16_t PIEZZO_LEVEL_MAX;           // Piezzo level where volume is MAX (=128)
+    int16_t PIEZZO_VOLUME_MIN;          // Volume at threshold : 0 -> 127
     int16_t BPM_MIN;                    // BPM minimum
     int16_t BPM_MAX;                    // BPM maximum
     int16_t ADC_DB;                     // DB reduction fopr ADC
@@ -80,8 +81,6 @@ extern T_Config conf;                           // Defined in global.cpp
 extern T_Parameter parameters[];                // Defined in global.cpp
 extern int nbParameters;                        // Defined in global.cpp
 
-extern T_Instru lSD[];
-extern uint8_t  nbSD;
 
 // extern T_LogPiezzo logPiezzo[];                 // Defined in global.cpp
 // extern uint8_t logPiezzoPos;                    // Defined in global.cpp
@@ -94,6 +93,10 @@ extern size_t fileMidiLen;                      // Defined in global.cpp
 
 extern const BYTE demoMidi[];                   // Defined in mididemo.cpp
 extern size_t demoMidiLen;                      // Defined in mididemo.cpp
+
+extern T_Instru instru;                         // Defined in instru.cpp
+extern T_NetCard netCards[];                    // Defined in device.cpp
+
 
 #ifdef CAPTURE_PIEZZO
 #define PIEZZO_NB   300

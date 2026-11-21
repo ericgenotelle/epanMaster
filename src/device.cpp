@@ -224,6 +224,12 @@ void readConfigEEPROM()
     resetConfigEEPROM();
   } else {
 
+    for (int i=0 ; i<NB_PIEZZO; i++) {
+      if (! readEEPROMInt( &addr , &sounds[i].threshold, 10,3000 ) ) {
+        saveEEPROOM = true;
+      }
+    }
+
     for (int i=0; i<nbParameters; i++) {
       if (! readEEPROMInt( &addr , parameters[i].pValue , parameters[i].min, parameters[i].max ) ) {
         saveEEPROOM = true;
@@ -251,6 +257,10 @@ void saveConfigEEPROM()
 
   // EEPROM CRC
   saveEEPROMInt( &addr , crc );
+
+  for (int i=0 ; i<NB_PIEZZO; i++) {
+    saveEEPROMInt( &addr , sounds[i].threshold );
+  }
 
   for (int i=0; i<nbParameters; i++) {
     saveEEPROMInt( &addr , *(parameters[i].pValue) );
@@ -790,6 +800,7 @@ void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
     uint8_t data[FRAME_LEN];
     uint32_t written = 0;
 
+  DEBUG5("sendCommValue",cardId,cmd,param,value);
   netCards[cardId].lastSent = millis();
 
 #ifdef I2C
@@ -816,6 +827,11 @@ void sendCommSetLED(uint8_t cardId , uint8_t no, HandLeftRight hand, bool on )
 void sendCommGoADC(uint8_t cardId , bool on)
 {
   sendCommValue( cardId, CMD_GO_ADC, 0, on ? 1 : 0);
+}
+
+void sendCommThreshold(uint8_t cardId, uint8_t no, uint16_t threshold)
+{
+  sendCommValue(cardId, CMD_SET_THRESHOLD, no, threshold);
 }
 
 
@@ -904,10 +920,6 @@ int getMidiNoteByCardId(uint8_t cardId, uint8_t no)
 }
 
 
-void sendCommThreshold(uint8_t cardId, uint8_t no, uint16_t threshold)
-{
-  sendCommValue(cardId, CMD_SET_THRESHOLD, no, threshold);
-}
 
 /// --------------------------------------------------------------
 /// @brief Send config of the card to the card

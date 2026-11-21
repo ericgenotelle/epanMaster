@@ -21,7 +21,7 @@
 // #define PROGRAMME_VERSION               "0104"      // Version of this program
 #define PROGRAMME_DATE                  __DATE__    // Date of this programf
 #define PROGRAMME_TIME                  __TIME__    // Time of this program
-#define EEPROM_CRC                      2       // checksum for EEPROM. For first run or memory map change
+#define EEPROM_CRC                      3       // checksum for EEPROM. For first run or memory map change
 
 // Select one of instruments
 #define HANDPAN                         
@@ -68,8 +68,8 @@
 #endif 
 
 
-#define APPLI_NAME                  "SteelDrum"         //Application Name in web root page
-#define APPLI_MIDI_NAME             "[MIDI] DIY SteelDrum"
+#define APPLI_NAME                  "Master"         //Application Name in web root page
+#define APPLI_MIDI_NAME             "[MIDI] DIY Master"
 #define PAN_WIFI_AP_SSID            "MASTER"                //SSID prefix in WIFI AP mode
 #define PAN_WIFI_AP_PASSWORD        "Pan1234!"              //Password related to SSID prefix in WIFI AP mode
 #define PAN_WIFI_STA_SSID           "BoxGnl_5GHz"           //SSID in WIFI STA mode

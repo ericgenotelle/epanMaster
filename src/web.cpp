@@ -425,15 +425,15 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
   nm.add("<body>");
 
   if (modeUser) {
-    nm.add( "<h2>" + String(APPLI_NAME) + " Configuration</h2>");
+    nm.add( "<h2>" + String(APPLI_NAME) + " " +  String(instru.nom) + " Configuration</h2>");
     nm.add( "<table>");
     nm.row( "<td>&nbsp;</td> <th>Seuil déclenchement</th> ");
 
     for (uint8_t cardId=0; cardId < instru.nbCards; cardId++) {
 
-      nm.row( "<tr><td colspan=2 class='blanche'>Carte " + String(cardId) + " </td>  ");
+      nm.row( "<tr><td colspan=2 class='blanche'>Carte " + String(cardId) +  " - " + String (instru.cards[cardId]->nom) + " : " + String(netCards[cardId].connected ? "connectée" : "déconnectée") + " </td>  ");
       nm.add( "<tr><td class='blanche'><b>Toutes notes</b></td>  ");
-      nm.add( "  <td><input id='thresholdM  " + String(cardId) + "' type='number' min='1' max='4095' required class='plage' value='"  +  String(PIEZZO_THRESHOLD_DEF) + "'/> ");
+      nm.add( "  <td><input id='thresholdM" + String(cardId) + "' type='number' min='1' max='4095' required class='plage' value='"  +  String(PIEZZO_THRESHOLD_DEF) + "'/> ");
       nm.add("   <button onclick=\" incValue('thresholdM" + String(cardId) + "',-50);  changeThresholdM" + String(cardId) + "();  \"  id='thresholdMdec" + String(cardId) + "' > - </button>");
       nm.add("  <button onclick=\"  incValue('thresholdM" + String(cardId) + "', 50);  changeThresholdM" + String(cardId) + "();  \"  id='thresholdMinc" + String(cardId) + "' > + </button>");
       nm.add("</td>  </tr>"); 
@@ -442,7 +442,7 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
         char noteName[10];
         getNoteName( noteName, instru.cards[cardId]->notes[i] );
         nm.add( "<tr><th>" + String( noteName ) + "</th>  ");
-        nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[i].threshold + "'/> ");
+        nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[ netCards[cardId].idxSounds[i] ].threshold + "'/> ");
         nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "',-50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholddec" + String( (cardId*10) + i ) + "' > - </button>");
         nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "', 50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholdinc" + String( (cardId*10) + i ) + "' > + </button>");
         nm.add("</td>  </tr>"); 
@@ -486,9 +486,21 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
   // ----------------------------------------
   nm.add( "<script>");
   nm.add("");
-  for (int i=0; i<nbParameters; i++) {
-    nm.add( "document.getElementById('" + parameters[i].name + "').addEventListener('change', (event) => { doAction('" + parameters[i].name + "',event.target.value);});  ") ;
-  }
+  if (modeUser) {
+    for (int cardId=0; cardId<instru.nbCards; cardId++) {
+      nm.add( "document.getElementById('thresholdM"+ String(cardId) + "').addEventListener('change', (event) => { changeThresholdM" + String(cardId) + "();});  ") ;
+      for (int i=0; i<instru.cards[cardId]->nbNotes; i++) {
+        nm.add( "document.getElementById('threshold" + String((cardId*10) + i) + "').addEventListener('change', (event) => { changeThreshold(" + String((cardId*10) + i) + ");});  ") ;
+      } 
+      nm.add("");
+    }
+  } else {
+
+    for (int i=0; i<nbParameters; i++) {
+      nm.add( "document.getElementById('" + parameters[i].name + "').addEventListener('change', (event) => { doAction('" + parameters[i].name + "',event.target.value);});  ") ;
+    }
+  }  
+
 
   nm.add( "" );
   nm.add( "</script>");
@@ -737,10 +749,9 @@ void _handleRest(AsyncWebServerRequest *request)
     int16_t threshold;
     nm.getParamInt("arg1",&noteEnc,&nbChanged);
     nm.getParamInt("arg2",&threshold,&nbChanged);
-    DEBUG3("threshold",noteEnc,threshold);
     uint8_t cardId = noteEnc / 10;
     uint8_t no = noteEnc % 10;
-    DEBUG3("  cardId / no",cardId,no);
+    DEBUG4("threshold",cardId,no,threshold);
 
     nm.add( "ok" );
     sounds [  netCards[ cardId ].idxSounds[no] ].threshold = threshold;

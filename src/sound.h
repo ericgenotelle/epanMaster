@@ -98,7 +98,7 @@ typedef struct
     bool                  ledLeftOn = false;
     bool                  ledRightOn = false;
     HandLeftRight         lastHand = HandLeft;
-    uint16_t              threshold = 4095;           // Threshold for piezzo signal to consider the volume min
+    int16_t               threshold = 4095;           // Threshold for piezzo signal to consider the volume min
     // unsigned long         lastPressed = 0;    // When the piezzo was played
     // int16_t               nbPressed = 0;      // Nb time the piezzo is pressed 
     unsigned long         lastMidiMessage = 0;       // when MIDI note has been sent

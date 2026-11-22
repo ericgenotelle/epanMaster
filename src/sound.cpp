@@ -96,13 +96,14 @@ void setupSound(const int16_t * wavData, size_t waveSize, uint8_t noteMidi,const
   sounds[idx].wavBody = wavData ;
   sounds[idx].wavSize = waveSize;
   sounds[idx].noteMidi = noteMidi;
+
   if (noteName!=NULL) {
     strcpy(sounds[idx].noteName, noteName);
   } else {
     getNoteName(sounds[idx].noteName, noteMidi);
   }
-  sounds[idx].ledRightOn = false;
   sounds[idx].ledLeftOn = false;
+  sounds[idx].ledRightOn = false;
 
   conf.nbSounds = idx+1;
 }
@@ -127,44 +128,55 @@ void setupSounds()
   setupSound(clic2_wav, sizeof(clic2_wav) / 2,  NOTE_MIDI_CLIC2, "CL2");  // CLIC : NEXT BEAT OF A MEASURE
   setupSound(error_wav, sizeof(error_wav) / 2,  NOTE_MIDI_ERROR, "ERR");  // ERROR : not exist, ..
   
-  // Load waves for thi isntrument
-  initWaves();
+  // Load waves for this instrument
+  initWaves();   // implemented in init.h of the sounds bank
 
 
+  // -----------------------------------------------------
   // Setup links between netCard[] & sounds[]
+  // -----------------------------------------------------
   for (int i=0; i < instru.nbCards; i++) {
     for (int j=0; j < instru.cards [i]->nbNotes ; j++) {
-      int note =  instru.cards [i]->notes[j];
+      uint8_t note =  instru.cards [i]->notes[j];
       if ( note > 0 ) {
-        int idx = getSoundIndexByNote( note );
-        if ( idx == NOTE_ERROR ) {
-            DEBUG2("ERREUR : Note MIDI non trouvé dans la liste des sons",note);
+        int idx = getSoundIndexByNoteMidi( note );
+        if ( idx == INDEX_SOUND_ERROR ) {
+            DEBUG2("!!!!!!!!!!!!!! ERREUR : Note MIDI non trouvé dans la liste des sons", note);
         } else {
           netCards[i].idxSounds[j] = idx;
           sounds[idx].cardId = i;
           sounds[idx].no = j;
         }
       }
-      netCards[i].ledLeftOn[j] = false;
-      netCards[i].ledRightOn[j] = false;
     }
   }
+  DEBUG2("setupSounds nbSounds:", conf.nbSounds);
+  // debugSounds();
 
 }
 
+//------------------------------------------------------------------------------------------------------------------------
+/// @brief Diplay all sounds in debug
+void debugSounds()
+{
+  DEBUG2("debugSounds (i,note,name,cardId,no):", conf.nbSounds)
+  for (int i=0; i<conf.nbSounds; i++) {
+    DEBUG6("  Sound ", i, sounds[i].noteMidi, sounds[i].noteName, sounds[i].cardId, sounds[i].no);
+  }
+}
 
 //------------------------------------------------------------------------------------------------------------------------
-/// @brief Retrieve the index of the sound related to a MIDI note 
+/// @brief Retrieve the index in `sounds` table related to a MIDI note. 
 /// @param noteMidi MIDI note
-/// @return index of the sound, -1 if not found
-uint8_t getSoundIndexByNote(uint8_t noteMidi)
+/// @return index of the sound, INDEX_SOUND_ERROR if not found
+uint8_t getSoundIndexByNoteMidi(uint8_t noteMidi)
 {
-  for (int i=0; i<NB_SOUNDS; i++) {
+  for (int i=0; i<conf.nbSounds; i++) {
     if ( sounds[i].noteMidi == noteMidi ) {
       return i;
     }
   }
-  return NOTE_ERROR;
+  return INDEX_SOUND_ERROR;
 }
 
 //------------------------------------------------------------------------------------------------------------------------
@@ -318,7 +330,7 @@ DEBUG2("** playSound LOOP 2;",millis());
 /// @return idxSound if OK, -1 if KO
 int playNote(int note, int volume)
 {
-  int idxSound = getSoundIndexByNote(note);
+  int idxSound = getSoundIndexByNoteMidi(note);
   if (idxSound>=0) {
     return playSound(idxSound,volume);
   } else {
@@ -542,17 +554,21 @@ float midiClic2Ms()
 
 
 //------------------------------------------------------------------------------------------------------------------------
-/// @brief  Indicate if the note `pSongNote` should be played if left or right hand, according to parity of note velocity.  pair = Right, impair = Left
-/// @param pSongNote note to play
-/// @return HandLeftRight
-HandLeftRight getHandVelocity(int velocity) 
+/// @brief Indicate if a note  should be played if left or right hand, according to parity of note velocity.  
+/// @param velocity 
+/// @return pair = HandRight, impair = HandLeft
+HandLeftRight getHandByVelocity(int velocity) 
 {
   return ( velocity % 2 ) ? HandRight : HandLeft;
 }
 
-HandLeftRight getHandSongNote(T_SongNote * pSongNote) 
+//------------------------------------------------------------------------------------------------------------------------
+/// @brief  Indicate if the note `pSongNote` should be played if left or right hand, according to parity of note velocity.  pair = Right, impair = Left
+/// @param pSongNote note to play
+/// @return pair = HandRight, impair = HandLeft
+HandLeftRight getHandBySongNote(T_SongNote * pSongNote) 
 {
-  return ( getHandVelocity(pSongNote->velocity) );
+  return ( getHandByVelocity(pSongNote->velocity) );
 }
 
 
@@ -763,7 +779,7 @@ bool generateSong(const MIDI_FILE *pMF)
   // --------------------------------------------------------------------
   for (i=0;i<song.nbNotes;i++) {
     // Retrieve song index 
-    song.lNotes[i].idxSound = getSoundIndexByNote( song.lNotes[i].noteMidi );
+    song.lNotes[i].idxSound = getSoundIndexByNoteMidi( song.lNotes[i].noteMidi );
 
     // Retrieve measure
     song.lNotes[i].measure = (song.lNotes[i].timeMidiStart / nbTicksByMeasure ) +1  ;
@@ -1094,7 +1110,7 @@ bool loopSong()
       }
 
       // Display the LED related to a sound
-      displayLED( pSongNote->idxSound , true, getHandSongNote(pSongNote) );
+      displayLED( pSongNote->idxSound , true, getHandBySongNote(pSongNote) );
 
       // ready for the next note
       song.noteCur ++;
@@ -1113,7 +1129,7 @@ bool loopSong()
         // Do nothing
       } else {
         pSongNote->state = ToBePlayed;
-        displayLED( pSongNote->idxSound, true, getHandSongNote(pSongNote) );
+        displayLED( pSongNote->idxSound, true, getHandBySongNote(pSongNote) );
         DEBUG3(" ---- JOUE la note ", pSongNote->idxSound, pSongNote->noteMidi);
         ret = true;
 
@@ -1122,7 +1138,7 @@ bool loopSong()
           T_SongNote * pNextNote = & song.lNotes[song.noteCur +1]; 
           if ( pSongNote->timeMidiStart == pNextNote->timeMidiStart ) {
             pNextNote->state = ToBePlayed;
-            displayLED( pNextNote->idxSound , true, getHandSongNote(pNextNote) );
+            displayLED( pNextNote->idxSound , true, getHandBySongNote(pNextNote) );
             DEBUG2(" --++ JOUE aussi la note ",pNextNote->noteMidi);
             song.doubleNotes = true;
           } else {
@@ -1137,7 +1153,7 @@ bool loopSong()
           song.trille = true;
           song.trilleNote1 = song.lNotes[song.noteCur].idxSound;
           song.trilleNote2 = song.lNotes[song.noteCur+1].idxSound;
-          song.trilleNote1Hand = getHandSongNote(& song.lNotes[song.noteCur]);
+          song.trilleNote1Hand = getHandBySongNote(& song.lNotes[song.noteCur]);
           song.trilleNote2Hand = (song.trilleNote1Hand==HandLeft) ? HandRight : HandLeft; // the opposite hand
           song.trilleNoteCurrent = song.trilleNote2; // force LED of note 1 
           song.trilleNoteLastTime = 0; //millis() + conf.DELAY_LED_TRILLE + 10;
@@ -1155,19 +1171,6 @@ bool loopSong()
 
 
 
-//------------------------------------------------------------------------------------------------------------------------
-/// @brief Retrieve the index of the sound related to a MIDI note 
-/// @param note MIDI note
-/// @return index of the sound, -1 if not found
-// int getSoundIndexByNote(int note)
-// {
-//   for (int i=0; i<NB_SOUNDS; i++) {
-//     if ( sounds[i].noteMidi == note ) {
-//       return i;
-//     }
-//   }
-//   return NOTE_ERROR;
-// }
 
 static const char * noteName [] = {
   "C", "C#", "D", "D#","E","F","F#","G","G#","A","A#","B"

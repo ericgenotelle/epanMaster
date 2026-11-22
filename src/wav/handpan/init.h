@@ -51,4 +51,5 @@ void initWaves()
   setupSound(a2_wav, sizeof(a2_wav) / 2,   note++ , 0); 
   setupSound(a2_wav, sizeof(a2_wav) / 2,   note++ , 0); 
 #endif
+  // DEBUG2("Last note",note-1)
 }

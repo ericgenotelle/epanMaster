@@ -302,33 +302,33 @@ void displayLED(int idxSound, bool on, HandLeftRight hand )
     if (!on)  {
       sendCommSetLED( cardId , no , HandLeft, false );
       sendCommSetLED( cardId , no , HandRight, false );
-      netCards[cardId].ledLeftOn[no] = false;
-      netCards[cardId].ledRightOn[no] = false;
+      sounds[idxSound].ledLeftOn = false;
+      sounds[idxSound].ledRightOn = false;
     } else {
       switch (hand) {
         case HandLeft:
           sendCommSetLED( cardId , no , HandLeft, true );
           sendCommSetLED( cardId , no , HandRight, false );
-          netCards[cardId].ledLeftOn[no] = true;
-          netCards[cardId].ledRightOn[no] = false;
+          sounds[idxSound].ledLeftOn = true;
+          sounds[idxSound].ledRightOn = false;
           break;
         case HandRight:
           sendCommSetLED( cardId , no , HandLeft, false );
           sendCommSetLED( cardId , no , HandRight, true );
-          netCards[cardId].ledLeftOn[no] = false;
-          netCards[cardId].ledRightOn[no] = true;
+          sounds[idxSound].ledLeftOn = false;
+          sounds[idxSound].ledRightOn = true;
           break;
         case HandBoth:
           sendCommSetLED( cardId , no , HandLeft, true );
           sendCommSetLED( cardId , no , HandRight, true );
-          netCards[cardId].ledLeftOn[no] = true;
-          netCards[cardId].ledRightOn[no] = true;
+          sounds[idxSound].ledLeftOn = true;
+          sounds[idxSound].ledRightOn = true;
           break;
         default:
           sendCommSetLED( cardId , no , HandLeft, false );
           sendCommSetLED( cardId , no , HandRight, false);
-          netCards[cardId].ledLeftOn[no] = false;
-          netCards[cardId].ledRightOn[no] = false;
+          sounds[idxSound].ledLeftOn = false;
+          sounds[idxSound].ledRightOn = false;
       }
     }
 
@@ -525,7 +525,7 @@ void touchNote(int idxSound, int velocity)
 /// @param velocity  velocity of note to play
 void touchNoteMidi(int noteMidi, int velocity) 
 {
-  int idxSound = getSoundIndexByNote(noteMidi);
+  int idxSound = getSoundIndexByNoteMidi(noteMidi);
   touchNote(idxSound, velocity);
 }
 
@@ -616,12 +616,12 @@ void handleMIDINoteOn(byte channel, byte noteMidi, byte velocity)
 {
 #ifdef MIDI_SEND
   DEBUG3("handleMIDINoteOn",noteMidi,velocity);
-  int idxSound = getSoundIndexByNote(noteMidi);
+  int idxSound = getSoundIndexByNoteMidi(noteMidi);
   if ( idxSound == NOTE_ERROR ) {
     return;
   }
   playSound(idxSound,velocity);
-  HandLeftRight h =  getHandVelocity( velocity);  
+  HandLeftRight h =  getHandByVelocity( velocity);  
   displayLED(idxSound, true, h);
 #endif
 }
@@ -631,7 +631,7 @@ void handleMIDINoteOff(byte channel, byte noteMidi, byte velocity)
 {
 #ifdef MIDI_SEND
   DEBUG3("handleMIDINoteOff",noteMidi,velocity);
-  int idxSound = getSoundIndexByNote(noteMidi);
+  int idxSound = getSoundIndexByNoteMidi(noteMidi);
   if ( idxSound == NOTE_ERROR ) {
     return;
   }
@@ -936,7 +936,7 @@ void sendCardConfig(uint8_t cardId)
   sendCommValue(cardId, CMD_SET_PARAM, PARAM_CARDID, cardId);
 
   for (uint8_t i=0; i<instru.cards[cardId]->nbNotes; i++) {
-    sendCommThreshold(cardId, i, sounds [ netCards[cardId].idxSounds[i] ].threshold );
+    sendCommThreshold(cardId, i, sounds [ getIndexSoundByCard(cardId, i) ].threshold );
   }
 }
 
@@ -967,6 +967,15 @@ T_Card * getCardByID(uint8_t id)
   return instru.cards[id];
 }
 
+uint8_t getIndexSoundByCard(uint8_t cardId, uint8_t no)
+{
+  if ( ! checkCardId(cardId) ) 
+    return 0;
+  if (no >= NB_NOTES_MAX) 
+    return 0;
+
+  return netCards[cardId].idxSounds[no];
+}
 
 uint8_t getParamIdByName(const char * name)
 {

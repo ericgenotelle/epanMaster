@@ -30,6 +30,8 @@
 #define NOTE_CLIC2  (NOTE_CLIC1 + 1) 
 #define NOTE_ERROR  (NOTE_CLIC1 + 2) 
 
+#define INDEX_SOUND_ERROR  255
+
 
 //------------------------------------------------------------------------------------------------------------------------
 /// @brief Status of a note
@@ -84,16 +86,15 @@ typedef struct
 typedef struct 
 {
     uint8_t               noteMidi;           // MIDI note 
-    char                  noteName [4];   // MIDI note name
+    char                  noteName [5];   // MIDI note name
 
     uint8_t               cardId = 0;  
     uint8_t               no = 0;
 
-    // T_Card *              card = NULL;
-    // T_NetCard *           netCard = NULL;
-
+    
     size_t                wavSize;
     const int16_t       * wavBody;            // WAV body
+    
     unsigned long         timeMsStop = 0;     // when the sound was finished to be played
     bool                  ledLeftOn = false;
     bool                  ledRightOn = false;
@@ -195,7 +196,8 @@ typedef struct
 
 void setupSound(const int16_t * wavData, size_t waveSize, uint8_t noteMidi,const char * noteName);
 void setupSounds();
-uint8_t getSoundIndexByNote(uint8_t note);
+void debugSounds();
+uint8_t getSoundIndexByNoteMidi(uint8_t note);
 bool isSoundClic(int indexSound);
 
 void resetNotePoly(int i);
@@ -215,8 +217,8 @@ void dumpWAVHeader(T_WavHeader * Wav);
 void loopPlayWaves();
 
 float midiClic2Ms();
-HandLeftRight getHandVelocity(int velocity);
-HandLeftRight getHandSongNote(T_SongNote * pSongNote);
+HandLeftRight getHandByVelocity(int velocity);
+HandLeftRight getHandBySongNote(T_SongNote * pSongNote);
 
 bool initiateSong() ;
 bool generateSong(const MIDI_FILE *pMF);

@@ -24,9 +24,6 @@
 typedef struct 
 {
     uint8_t             idxSounds [NB_NOTES_MAX];
-    uint8_t             ledLeftOn[NB_NOTES_MAX];
-    uint8_t             ledRightOn[NB_NOTES_MAX];
-
     bool                connected = false;
     unsigned long       lastReceived=0;
     unsigned long       lastSent=0;
@@ -77,4 +74,5 @@ void sendCommThreshold(uint8_t cardId, uint8_t no, uint16_t threshold);
 void sendCardConfig(uint8_t cardId);
 bool checkNewCard(uint8_t cardId);
 bool checkCardId(uint8_t id);
+uint8_t getIndexSoundByCard(uint8_t cardId, uint8_t no);
 void sendAllCardsParam(const char *paramName, int16_t value);

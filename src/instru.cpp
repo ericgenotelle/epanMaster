@@ -36,13 +36,13 @@ T_Card sdHandPan2 =
   SD_HANDPAN2, "HandPan2" , 6, 
   { 
     MIDI_NOTE_C3 + MIDI_NOTE_A_SHARP,       // 0
-    MIDI_NOTE_C3 + MIDI_NOTE_C_SHARP,       // 1
+    MIDI_NOTE_C4 + MIDI_NOTE_C_SHARP,       // 1
     MIDI_NOTE_C4 + MIDI_NOTE_D_SHARP,       // 2
     MIDI_NOTE_C4 + MIDI_NOTE_F_SHARP,       // 3
     MIDI_NOTE_C4 + MIDI_NOTE_G_SHARP,       // 4
     MIDI_NOTE_C4 + MIDI_NOTE_A_SHARP,       // 5
-    0,       // 6
-    0,       // 7
+    0,                                      // 6
+    0,                                      // 7
   } 
 };
 T_Instru instru =

@@ -48,7 +48,7 @@ void _handleRoot(AsyncWebServerRequest *request)
   // Affichage de la page HTML
   // --------------------------
   nm.clear();
-  nm.head( String(APPLI_NAME) );
+  nm.head( String(APPLI_NAME) + " " + String(instru.nom) );
   nm.add("<script>");
   nm.add("var idChange=-1;");
   nm.add("var playing=0;");
@@ -442,7 +442,7 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
         char noteName[10];
         getNoteName( noteName, instru.cards[cardId]->notes[i] );
         nm.add( "<tr><th>" + String( noteName ) + "</th>  ");
-        nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[ netCards[cardId].idxSounds[i] ].threshold + "'/> ");
+        nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[ getIndexSoundByCard(cardId, i) ].threshold + "'/> ");
         nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "',-50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholddec" + String( (cardId*10) + i ) + "' > - </button>");
         nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "', 50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholdinc" + String( (cardId*10) + i ) + "' > + </button>");
         nm.add("</td>  </tr>"); 
@@ -754,7 +754,7 @@ void _handleRest(AsyncWebServerRequest *request)
     DEBUG4("threshold",cardId,no,threshold);
 
     nm.add( "ok" );
-    sounds [  netCards[ cardId ].idxSounds[no] ].threshold = threshold;
+    sounds [ getIndexSoundByCard(cardId, no) ].threshold = threshold;
     sendCommThreshold( cardId, no, threshold );
     return; 
   }     

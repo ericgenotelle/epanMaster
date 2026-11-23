@@ -47,7 +47,7 @@ T_Card sdHandPan2 =
 };
 T_Instru instru =
 {
-  SD_HANDPAN, "HandPan",2,
+  SD_HANDPAN, "HandPan",1,
   {
     & sdHandPan1,
     & sdHandPan2,

@@ -775,8 +775,14 @@ void setupComm()
     Wire.setTimeOut(50);                    // timeout en ms
 #endif
 
-#ifdef ESPNOW
+for (int cardId=0; cardId<  instru.nbCards; cardId++) {
+  netCards[cardId].i2cSlaveAddr = (int)I2C_CARD_ADDR_BASE + cardId;
+  netCards[cardId].lastReceived = 0;  
+  netCards[cardId].lastSent = 0;  
+  netCards[cardId].connected = false;
+}
 
+#ifdef ESPNOW
   WiFi.mode(WIFI_AP_STA);
 
   if (esp_now_init() != ESP_OK)   {
@@ -800,7 +806,7 @@ void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
     uint8_t data[FRAME_LEN];
     uint32_t written = 0;
 
-  DEBUG5("sendCommValue",cardId,cmd,param,value);
+  DEBUG6("sendCommValue (addr,id,cmd,param,value)",netCards[cardId].i2cSlaveAddr,cardId,cmd,param,value);
   netCards[cardId].lastSent = millis();
 
 #ifdef I2C
@@ -861,43 +867,55 @@ void recvCommHitPad(uint8_t cardId, uint8_t param, uint16_t value)
 void loopComm()
 {
 
+static unsigned long lastcommLoop = 0; 
+static uint16_t cnt = 0;
+  if ( (millis() - lastcommLoop) < 2000 ) {
+      return;
+  }
+  lastcommLoop = millis();
+  sendCommValue( 0, CMD_PING, 0, cnt);
+  cnt++;
+  return;
+
 #ifdef I2C
   uint8_t    data[FRAME_LEN];
 
   for (int i=0; i<instru.nbCards; i++) {
     int i2cCardAddr =  (int)I2C_CARD_ADDR_BASE + i;
-    if (Wire.requestFrom( i2cCardAddr , FRAME_LEN) != FRAME_LEN) {
-        return ;
-    }
-    for (int i = 0; i < FRAME_LEN; i++) {
-      data[i] = Wire.read();
-    }
-    uint8_t cmd = data[DATA_CMD];
-    uint8_t cardId = data[DATA_CARDID];
-    uint8_t param = data[DATA_PARAM];
-    uint16_t value = (data[DATA_VALUE_MSB] << 8) | data[DATA_VALUE_LSB];
+unsigned long now = millis();
+    uint8_t nbRead = Wire.requestFrom( i2cCardAddr , FRAME_LEN);
+DEBUG3("requesfrom (nb, delai)",nbRead, (millis()-now));
+    if ( nbRead == FRAME_LEN ) {
+      for (int i = 0; i < FRAME_LEN; i++) {
+        data[i] = Wire.read();
+      }
+      uint8_t cmd = data[DATA_CMD];
+      uint8_t cardId = data[DATA_CARDID];
+      uint8_t param = data[DATA_PARAM];
+      uint16_t value = (data[DATA_VALUE_MSB] << 8) | data[DATA_VALUE_LSB];
 
-    if ( cardId != i ) {
-      DEBUG3("ERREUR: CardId does not match i2cCardAddr",cardId,i)
-    }
-    netCards[cardId].lastReceived = millis();
+      if ( cardId != i ) {
+        DEBUG3("ERREUR: CardId does not match i2cCardAddr",cardId,i)
+      }
+      netCards[cardId].lastReceived = millis();
 
-    switch ( cmd ) 
-    {
-      case CMD_PING:
-        recvCommPing( cardId, param, value );
-        break;
+      switch ( cmd ) 
+      {
+        case CMD_PING:
+          recvCommPing( cardId, param, value );
+          break;
 
-      case CMD_CNX:
-        recvCommCnx( cardId, param, value );
-        break;
+        case CMD_CNX:
+          recvCommCnx( cardId, param, value );
+          break;
 
-      case CMD_HIT_PAD:
-        recvCommHitPad( cardId, param, value );
-        break;
+        case CMD_HIT_PAD:
+          recvCommHitPad( cardId, param, value );
+          break;
 
-       default:
-        DEBUG3("recv Unknown command from card", cardId, cmd );
+        default:
+          DEBUG3("recv Unknown command from card", cardId, cmd );
+      }
     }
   }
 #endif

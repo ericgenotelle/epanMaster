@@ -41,7 +41,7 @@ MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MidiUsb);
 #define LED_PIN 48
 Adafruit_NeoPixel pixels(NUMPIXELS,LED_PIN,NEO_GRB + NEO_KHZ800);
 
-T_NetCard netCards[ NB_CARDS_MAX ];
+// T_NetCard netCards[ NB_CARDS_MAX ];
 
 
 
@@ -61,14 +61,13 @@ T_NetCard netCards[ NB_CARDS_MAX ];
 
 // Pad -> Master
 #define CMD_PING                      0
-#define CMD_CNX                       1
+#define CMD_REQUEST                   1
 #define CMD_HIT_PAD                   2
-
-// Master -> Pad
-#define CMD_SET_LED                 100   
-#define CMD_SET_PARAM               101      // See PARAM_*
-#define CMD_GO_ADC                  102
-#define CMD_SET_THRESHOLD           103
+#define CMD_SET_LED                   3   
+#define CMD_SET_PARAM                 4        // See PARAM_*
+#define CMD_GO_ADC                    5
+#define CMD_SET_THRESHOLD             6  
+#define CMD_NOPE                      7
 
 #define PARAM_CARDID                  0
 #define PARAM_PIEZZO_VOLUME_MIN       1
@@ -776,10 +775,10 @@ void setupComm()
 #endif
 
 for (int cardId=0; cardId<  instru.nbCards; cardId++) {
-  netCards[cardId].i2cSlaveAddr = (int)I2C_CARD_ADDR_BASE + cardId;
-  netCards[cardId].lastReceived = 0;  
-  netCards[cardId].lastSent = 0;  
-  netCards[cardId].connected = false;
+  instru.cards[cardId]->i2cSlaveAddr = (int)I2C_CARD_ADDR_BASE + cardId;
+  instru.cards[cardId]->lastReceived = 0;  
+  instru.cards[cardId]->lastSent = 0;  
+  instru.cards[cardId]->connected = false;
 }
 
 #ifdef ESPNOW
@@ -806,8 +805,8 @@ void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
     uint8_t data[FRAME_LEN];
     uint32_t written = 0;
 
-  DEBUG6("sendCommValue (addr,id,cmd,param,value)",netCards[cardId].i2cSlaveAddr,cardId,cmd,param,value);
-  netCards[cardId].lastSent = millis();
+  DEBUG6("sendCommValue (addr,id,cmd,param,value)",instru.cards[cardId]->i2cSlaveAddr,cardId,cmd,param,value);
+  instru.cards[cardId]->lastSent = millis();
 
 #ifdef I2C
     data[DATA_CARDID] = cardId;
@@ -816,7 +815,7 @@ void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
     data[DATA_VALUE_MSB] = (value >> 8) & 0xFF;
     data[DATA_VALUE_LSB] = value & 0xFF;
 
-    Wire.beginTransmission( netCards[cardId].i2cSlaveAddr ); 
+    Wire.beginTransmission( instru.cards[cardId]->i2cSlaveAddr ); 
     Wire.write(data, FRAME_LEN);
     Wire.endTransmission();
 #endif
@@ -825,7 +824,7 @@ void sendCommValue(int8_t cardId, int8_t cmd, int8_t param, uint16_t value)
 void sendCommSetLED(uint8_t cardId , uint8_t no, HandLeftRight hand, bool on ) 
 {
   int8_t offset = (hand == HandRight) ? 1 : 0 ;
-  if ( netCards[cardId].connected) {
+  if ( instru.cards[cardId]->connected) {
     sendCommValue( cardId, CMD_SET_LED, (no * 2) + offset, on ? 1 : 0);
   }
 }
@@ -844,7 +843,7 @@ void sendCommThreshold(uint8_t cardId, uint8_t no, uint16_t threshold)
 void recvCommPing(uint8_t cardId, uint8_t param, uint16_t value)
 {
   DEBUG4("recv CMD_PING from card", cardId, param, value);
-  sendCommValue( cardId, CMD_PING, param, value);
+  // sendCommValue( cardId, CMD_PING, param, value);
 }
 
 void recvCommCnx(uint8_t cardId, uint8_t param, uint16_t value)
@@ -867,24 +866,25 @@ void recvCommHitPad(uint8_t cardId, uint8_t param, uint16_t value)
 void loopComm()
 {
 
+  #ifdef I2C
+
 static unsigned long lastcommLoop = 0; 
 static uint16_t cnt = 0;
   if ( (millis() - lastcommLoop) < 2000 ) {
       return;
   }
   lastcommLoop = millis();
-  sendCommValue( 0, CMD_PING, 0, cnt);
   cnt++;
-  return;
-
-#ifdef I2C
   uint8_t    data[FRAME_LEN];
 
-  for (int i=0; i<instru.nbCards; i++) {
-    int i2cCardAddr =  (int)I2C_CARD_ADDR_BASE + i;
-unsigned long now = millis();
+  for (int cardId=0; cardId<instru.nbCards; cardId++) {
+
+    sendCommValue( cardId, CMD_REQUEST, 0, cnt);
+
+    int i2cCardAddr =  (int)I2C_CARD_ADDR_BASE + cardId;
+// unsigned long now = millis();
     uint8_t nbRead = Wire.requestFrom( i2cCardAddr , FRAME_LEN);
-DEBUG3("requesfrom (nb, delai)",nbRead, (millis()-now));
+// DEBUG3("requesfrom (nb, delai)",nbRead, (millis()-now));
     if ( nbRead == FRAME_LEN ) {
       for (int i = 0; i < FRAME_LEN; i++) {
         data[i] = Wire.read();
@@ -894,10 +894,10 @@ DEBUG3("requesfrom (nb, delai)",nbRead, (millis()-now));
       uint8_t param = data[DATA_PARAM];
       uint16_t value = (data[DATA_VALUE_MSB] << 8) | data[DATA_VALUE_LSB];
 
-      if ( cardId != i ) {
-        DEBUG3("ERREUR: CardId does not match i2cCardAddr",cardId,i)
+      if ( cardId != cardId ) {
+        DEBUG3("ERREUR: CardId does not match i2cCardAddr",cardId,cardId)
       }
-      netCards[cardId].lastReceived = millis();
+      instru.cards[cardId]->lastReceived = millis();
 
       switch ( cmd ) 
       {
@@ -905,8 +905,8 @@ DEBUG3("requesfrom (nb, delai)",nbRead, (millis()-now));
           recvCommPing( cardId, param, value );
           break;
 
-        case CMD_CNX:
-          recvCommCnx( cardId, param, value );
+        case CMD_SET_PARAM:
+          sendCardConfig( cardId );
           break;
 
         case CMD_HIT_PAD:
@@ -934,7 +934,7 @@ int getMidiNoteByCardId(uint8_t cardId, uint8_t no)
   if (no >= NB_NOTES_MAX) 
     return 0;
 
-  return instru.cards[cardId]->notes[ no ];
+  return instru.cards[cardId]->notesMidi[ no ];
 }
 
 
@@ -961,10 +961,10 @@ void sendCardConfig(uint8_t cardId)
 
 bool checkNewCard(uint8_t cardId)
 {
-  if ( netCards[cardId].connected == false ) {
+  if ( instru.cards[cardId]->connected == false ) {
     DEBUG2("New card",cardId);
 
-    netCards[cardId].connected = true;
+    instru.cards[cardId]->connected = true;
     return true;
   }
   return false;
@@ -992,7 +992,7 @@ uint8_t getIndexSoundByCard(uint8_t cardId, uint8_t no)
   if (no >= NB_NOTES_MAX) 
     return 0;
 
-  return netCards[cardId].idxSounds[no];
+  return instru.cards[cardId]->idxSounds[no];
 }
 
 uint8_t getParamIdByName(const char * name)

@@ -23,13 +23,17 @@
 #define PROGRAMME_TIME                  __TIME__    // Time of this program
 #define EEPROM_CRC                      3       // checksum for EEPROM. For first run or memory map change
 
+//------------------------------------------------------------------------------------------------
 // Select one of instruments
+//------------------------------------------------------------------------------------------------
 #define HANDPAN                         
 // #define TENORBASS                       
 // #define DOUBLEGUITAR     
 // #define TENOR             
 
+//------------------------------------------------------------------------------------------------
 // Select one communication mode
+//------------------------------------------------------------------------------------------------
 #define I2C
 //#define ESPNOW
 
@@ -61,7 +65,7 @@
     #define BANKNAME       "BANK2"
 #elif defined(BANK3)
     #define BANKNAME       "BANK3"
-#elif defined(BANK3)f
+#elif defined(BANK4)
     #define BANKNAME       "BANK4"
 #else 
     #define BANKNAME       "HANDPAN"

@@ -95,7 +95,7 @@ extern const BYTE demoMidi[];                   // Defined in mididemo.cpp
 extern size_t demoMidiLen;                      // Defined in mididemo.cpp
 
 extern T_Instru instru;                         // Defined in instru.cpp
-extern T_NetCard netCards[];                    // Defined in device.cpp
+// extern T_NetCard netCards[];                    // Defined in device.cpp
 
 
 #ifdef CAPTURE_PIEZZO

@@ -137,13 +137,13 @@ void setupSounds()
   // -----------------------------------------------------
   for (int i=0; i < instru.nbCards; i++) {
     for (int j=0; j < instru.cards [i]->nbNotes ; j++) {
-      uint8_t note =  instru.cards [i]->notes[j];
+      uint8_t note =  instru.cards [i]->notesMidi[j];
       if ( note > 0 ) {
         int idx = getSoundIndexByNoteMidi( note );
         if ( idx == INDEX_SOUND_ERROR ) {
             DEBUG2("!!!!!!!!!!!!!! ERREUR : Note MIDI non trouvé dans la liste des sons", note);
         } else {
-          netCards[i].idxSounds[j] = idx;
+          instru.cards[i]->idxSounds[j] = idx;
           sounds[idx].cardId = i;
           sounds[idx].no = j;
         }

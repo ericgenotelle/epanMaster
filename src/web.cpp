@@ -431,7 +431,7 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
 
     for (uint8_t cardId=0; cardId < instru.nbCards; cardId++) {
 
-      nm.row( "<tr><td colspan=2 class='blanche'>Carte " + String(cardId) +  " - " + String (instru.cards[cardId]->nom) + " : " + String(netCards[cardId].connected ? "connectée" : "déconnectée") + " </td>  ");
+      nm.row( "<tr><td colspan=2 class='blanche'>Carte " + String(cardId) +  " - " + String (instru.cards[cardId]->nom) + " : " + String( instru.cards[cardId]->connected ? "connectée" : "déconnectée") + " </td>  ");
       nm.add( "<tr><td class='blanche'><b>Toutes notes</b></td>  ");
       nm.add( "  <td><input id='thresholdM" + String(cardId) + "' type='number' min='1' max='4095' required class='plage' value='"  +  String(PIEZZO_THRESHOLD_DEF) + "'/> ");
       nm.add("   <button onclick=\" incValue('thresholdM" + String(cardId) + "',-50);  changeThresholdM" + String(cardId) + "();  \"  id='thresholdMdec" + String(cardId) + "' > - </button>");
@@ -440,7 +440,7 @@ void _handleConfig(AsyncWebServerRequest *request, bool modeUser)
 
       for (int i=0; i<instru.cards[cardId]->nbNotes; i++) {
         char noteName[10];
-        getNoteName( noteName, instru.cards[cardId]->notes[i] );
+        getNoteName( noteName, instru.cards[cardId]->notesMidi[i] );
         nm.add( "<tr><th>" + String( noteName ) + "</th>  ");
         nm.add( "  <td><input id='threshold" + String( (cardId*10) + i ) + "' type='number' min='1' max='4095' required class='plage' value='"  + sounds[ getIndexSoundByCard(cardId, i) ].threshold + "'/> ");
         nm.add("<button onclick=\" incValue('threshold" + String( (cardId*10) + i ) + "',-50);  changeThreshold(" + String( (cardId*10) + i ) + ");  \"  id='thresholddec" + String( (cardId*10) + i ) + "' > - </button>");

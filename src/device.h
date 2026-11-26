@@ -21,20 +21,20 @@
 // };
 
 
-typedef struct 
-{
-    uint8_t             idxSounds [NB_NOTES_MAX];
-    bool                connected = false;
-    unsigned long       lastReceived=0;
-    unsigned long       lastSent=0;
-#ifdef ESPNOW
-    uint8_t             mac[6];
-    esp_now_peer_info_t peerInfo = {};
-#endif
-#ifdef I2C
-    uint8_t             i2cSlaveAddr;
-#endif
-} T_NetCard;
+// typedef struct 
+// {
+//     uint8_t             idxSounds [NB_NOTES_MAX];
+//     bool                connected = false;
+//     unsigned long       lastReceived=0;
+//     unsigned long       lastSent=0;
+// #ifdef ESPNOW
+//     uint8_t             mac[6];
+//     esp_now_peer_info_t peerInfo = {};
+// #endif
+// #ifdef I2C
+//     uint8_t             i2cSlaveAddr;
+// #endif
+// } T_NetCard;
 
 void setupDevices();
 
